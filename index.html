@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#08111f" />
+    <title>Neon Relic Runner</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <canvas id="gameCanvas" aria-label="Jogo Neon Relic Runner"></canvas>
+
+      <section class="hud" aria-live="polite">
+        <div class="meter">
+          <span class="label">Energia</span>
+          <span id="energyText">100</span>
+          <div class="bar"><i id="energyBar"></i></div>
+        </div>
+        <div class="score-box">
+          <span id="scoreText">0</span>
+          <small>pontos</small>
+        </div>
+        <div class="meter right">
+          <span class="label">Combo</span>
+          <span id="comboText">x1</span>
+          <div class="bar violet"><i id="comboBar"></i></div>
+        </div>
+      </section>
+
+      <section id="startPanel" class="panel visible">
+        <p class="eyebrow">Arcade web para MIT App Inventor</p>
+        <h1>Neon Relic Runner</h1>
+        <p class="intro">
+          Toque e arraste para guiar a nave pelo corredor neon. Colete reliquias,
+          desvie dos sentinelas e use pulsos para sobreviver conforme a simulacao
+          fica mais intensa.
+        </p>
+        <button id="startButton" type="button">Iniciar jogo</button>
+      </section>
+
+      <section id="gameOverPanel" class="panel">
+        <p class="eyebrow">Fim da rodada</p>
+        <h2 id="finalTitle">Missao encerrada</h2>
+        <p id="finalStats" class="intro">Pontuacao: 0</p>
+        <button id="restartButton" type="button">Jogar novamente</button>
+      </section>
+
+      <div class="touch-pad">
+        <button id="pulseButton" class="pulse" type="button" aria-label="Ativar pulso defensivo">
+          PULSO
+        </button>
+      </div>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
