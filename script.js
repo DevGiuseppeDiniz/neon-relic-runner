@@ -24,7 +24,7 @@ const game = {
   best: Number(localStorage.getItem("neonDashBest") || 0),
   groundY: 0,
   ceilingY: 0,
-  gravity: 2100,
+  gravity: 2250,
   gravityDir: 1,
   jumpHeld: false,
   holdTime: 0,
@@ -41,6 +41,7 @@ const game = {
     grounded: true,
   },
   obstacles: [],
+  platforms: [],
   coinsList: [],
   portals: [],
   particles: [],
@@ -93,6 +94,7 @@ function startGame() {
   game.portalTimer = 4.5;
   game.shake = 0;
   game.obstacles = [];
+  game.platforms = [];
   game.coinsList = [];
   game.portals = [];
   game.particles = [];
@@ -145,7 +147,7 @@ function blockBrowserGesture(event) {
 
 function jump() {
   if (!game.player.grounded) return;
-  game.player.vy = -780 * game.gravityDir;
+  game.player.vy = -650 * game.gravityDir;
   game.player.grounded = false;
   burst(game.player.x, game.player.y + game.player.size, "#68e4ff", 12);
 }
@@ -156,16 +158,20 @@ function floorY() {
 
 function spawnObstacle() {
   const pattern = Math.random();
-  if (pattern < 0.34) {
+  if (pattern < 0.27) {
     spawnSpikeRow(1 + Math.floor(Math.random() * 3));
     return;
   }
-  if (pattern < 0.58) {
+  if (pattern < 0.49) {
     spawnBlockAndSpike();
     return;
   }
-  if (pattern < 0.78) {
+  if (pattern < 0.66) {
     spawnSaw();
+    return;
+  }
+  if (pattern < 0.86) {
+    spawnPlatformChallenge();
     return;
   }
   spawnGate();
@@ -173,7 +179,7 @@ function spawnObstacle() {
 
 function spawnSpikeRow(count) {
   const base = floorY();
-  const size = clamp(game.player.size * 0.92, 24, 32);
+  const size = clamp(game.player.size * 0.72, 19, 25);
   for (let i = 0; i < count; i += 1) {
     game.obstacles.push({
       x: game.w + 44 + i * (size * 0.88),
@@ -187,8 +193,8 @@ function spawnSpikeRow(count) {
 
 function spawnBlockAndSpike() {
   const base = floorY();
-  const block = clamp(game.player.size * 1.05, 30, 38);
-  const gap = clamp(game.player.size * 2.55, 76, 96);
+  const block = clamp(game.player.size * 0.94, 26, 34);
+  const gap = clamp(game.player.size * 2.15, 62, 78);
   const floatingY =
     game.gravityDir === 1 ? base - gap - block : base + gap;
   game.obstacles.push({
@@ -209,8 +215,8 @@ function spawnBlockAndSpike() {
 
 function spawnSaw() {
   const base = floorY();
-  const r = clamp(game.player.size * 0.65, 18, 24);
-  const lift = clamp(game.player.size * 2.25, 66, 82);
+  const r = clamp(game.player.size * 0.55, 15, 20);
+  const lift = clamp(game.player.size * 1.95, 54, 70);
   game.obstacles.push({
     x: game.w + 56,
     y: game.gravityDir === 1 ? base - lift : base + lift,
@@ -222,7 +228,7 @@ function spawnSaw() {
 
 function spawnGate() {
   const base = floorY();
-  const size = clamp(game.player.size * 0.9, 24, 31);
+  const size = clamp(game.player.size * 0.72, 19, 25);
   spawnSpikeRow(1);
   game.obstacles.push({
     x: game.w + 142,
@@ -238,6 +244,37 @@ function spawnGate() {
     h: size,
     type: "spike",
   });
+}
+
+function spawnPlatformChallenge() {
+  const base = floorY();
+  const h = clamp(game.player.size * 0.48, 13, 17);
+  const w = clamp(game.player.size * (2.15 + Math.random() * 0.9), 62, 94);
+  const lift = clamp(game.player.size * 1.65, 46, 60);
+  const y = game.gravityDir === 1 ? base - lift : base + lift - h;
+  const x = game.w + 48;
+  game.platforms.push({
+    x,
+    y,
+    w,
+    h,
+    type: "platform",
+  });
+  game.obstacles.push({
+    x: x + w + 34,
+    y: game.gravityDir === 1 ? base - h * 1.55 : base,
+    w: h * 1.55,
+    h: h * 1.55,
+    type: "spike",
+  });
+  if (Math.random() > 0.46) {
+    game.coinsList.push({
+      x: x + w * 0.5,
+      y: game.gravityDir === 1 ? y - 24 : y + h + 24,
+      r: clamp(game.player.size * 0.3, 8, 11),
+      phase: 0,
+    });
+  }
 }
 
 function spawnCoin() {
@@ -277,16 +314,19 @@ function update(dt) {
 }
 
 function updatePlayer(dt) {
-  const holdBoost = game.jumpHeld && game.holdTime < 0.13 && !game.player.grounded;
+  const previousY = game.player.y;
+  const holdBoost = game.jumpHeld && game.holdTime < 0.08 && !game.player.grounded;
   if (holdBoost) {
-    game.player.vy -= 1250 * dt * game.gravityDir;
+    game.player.vy -= 850 * dt * game.gravityDir;
     game.holdTime += dt;
   }
 
   game.player.vy += game.gravity * dt * game.gravityDir;
   game.player.y += game.player.vy * dt;
   game.player.angle += (game.player.grounded ? 0.02 : 7.6 * dt) * game.gravityDir;
+  game.player.grounded = false;
 
+  resolvePlatformLanding(previousY);
   const base = floorY();
   if (game.gravityDir === 1 && game.player.y + game.player.size >= base) {
     game.player.y = base - game.player.size;
@@ -299,6 +339,38 @@ function updatePlayer(dt) {
     game.player.vy = 0;
     game.player.grounded = true;
     game.player.angle = Math.round(game.player.angle / (Math.PI / 2)) * (Math.PI / 2);
+  }
+}
+
+function resolvePlatformLanding(previousY) {
+  const boxLeft = game.player.x + 5;
+  const boxRight = game.player.x + game.player.size - 5;
+  for (const platform of game.platforms) {
+    const overlapsX = boxRight > platform.x && boxLeft < platform.x + platform.w;
+    if (!overlapsX) continue;
+    if (game.gravityDir === 1 && game.player.vy >= 0) {
+      const previousBottom = previousY + game.player.size;
+      const currentBottom = game.player.y + game.player.size;
+      if (previousBottom <= platform.y + 4 && currentBottom >= platform.y) {
+        game.player.y = platform.y - game.player.size;
+        game.player.vy = 0;
+        game.player.grounded = true;
+        game.player.angle = Math.round(game.player.angle / (Math.PI / 2)) * (Math.PI / 2);
+        return;
+      }
+    }
+    if (game.gravityDir === -1 && game.player.vy <= 0) {
+      const previousTop = previousY;
+      const currentTop = game.player.y;
+      const surface = platform.y + platform.h;
+      if (previousTop >= surface - 4 && currentTop <= surface) {
+        game.player.y = surface;
+        game.player.vy = 0;
+        game.player.grounded = true;
+        game.player.angle = Math.round(game.player.angle / (Math.PI / 2)) * (Math.PI / 2);
+        return;
+      }
+    }
   }
 }
 
@@ -323,6 +395,9 @@ function updateSpawns(dt) {
 
 function updateObjects(dt) {
   const move = game.speed * dt;
+  for (const platform of game.platforms) {
+    platform.x -= move;
+  }
   for (const obstacle of game.obstacles) {
     obstacle.x -= move;
     obstacle.phase = (obstacle.phase || 0) + dt * 6;
@@ -357,6 +432,7 @@ function updateObjects(dt) {
   }
 
   game.obstacles = game.obstacles.filter((item) => item.x > -110);
+  game.platforms = game.platforms.filter((item) => item.x + item.w > -80);
   game.coinsList = game.coinsList.filter((item) => item.x > -80);
   game.portals = game.portals.filter((item) => item.x > -90);
 }
@@ -443,6 +519,7 @@ function draw() {
   ctx.translate(sx, sy);
   drawBackground();
   drawTrack();
+  drawPlatforms();
   drawCoins();
   drawPortals();
   drawObstacles();
@@ -510,6 +587,22 @@ function drawPlatform(y, dir) {
     ctx.stroke();
   }
   ctx.restore();
+}
+
+function drawPlatforms() {
+  for (const platform of game.platforms) {
+    ctx.save();
+    ctx.translate(platform.x, platform.y);
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = "#5eead4";
+    ctx.fillStyle = "#5eead4";
+    ctx.fillRect(0, 0, platform.w, platform.h);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(8, 18, 29, 0.4)";
+    const inset = Math.max(4, platform.h * 0.28);
+    ctx.fillRect(inset, inset, Math.max(4, platform.w - inset * 2), Math.max(3, platform.h - inset * 2));
+    ctx.restore();
+  }
 }
 
 function drawPlayer() {

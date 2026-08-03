@@ -39,6 +39,10 @@
         aria-label="Controle de toque"
         ontouchstart="window.neonDashPress && window.neonDashPress(event)"
         ontouchend="window.neonDashRelease && window.neonDashRelease(event)"
+        onpointerdown="window.neonDashPress && window.neonDashPress(event)"
+        onpointerup="window.neonDashRelease && window.neonDashRelease(event)"
+        onmousedown="window.neonDashPress && window.neonDashPress(event)"
+        onmouseup="window.neonDashRelease && window.neonDashRelease(event)"
         onclick="window.neonDashPress && window.neonDashPress(event)"
       ></button>
 
