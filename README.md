@@ -1,13 +1,14 @@
-# Neon Relic Runner
+# Neon Dash Touch
 
-Jogo web em HTML, CSS e JavaScript para rodar em navegador, GitHub Pages e dentro do componente **WebViewer** do MIT App Inventor.
+Jogo web estilo Geometry Dash em HTML, CSS e JavaScript para rodar em navegador, GitHub Pages e dentro do componente **WebViewer** do MIT App Inventor.
 
 ## Como jogar
 
-- Toque e arraste para mover a nave.
-- Colete reliquias para pontuar, recuperar energia e aumentar o combo.
-- Desvie dos sentinelas.
-- Use o botao **PULSO** para destruir ameacas proximas.
+- Toque em qualquer lugar da tela para iniciar.
+- Toque para pular.
+- Segure o toque por um instante para um salto mais alto.
+- Colete moedas e desvie dos espinhos.
+- Atravesse portais para inverter a gravidade.
 
 ## Publicar no GitHub Pages
 

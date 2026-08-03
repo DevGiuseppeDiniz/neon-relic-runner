@@ -2,362 +2,442 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 const ui = {
-  energyText: document.getElementById("energyText"),
-  energyBar: document.getElementById("energyBar"),
-  comboText: document.getElementById("comboText"),
-  comboBar: document.getElementById("comboBar"),
-  scoreText: document.getElementById("scoreText"),
-  startPanel: document.getElementById("startPanel"),
-  gameOverPanel: document.getElementById("gameOverPanel"),
-  finalTitle: document.getElementById("finalTitle"),
-  finalStats: document.getElementById("finalStats"),
-  startButton: document.getElementById("startButton"),
-  restartButton: document.getElementById("restartButton"),
-  pulseButton: document.getElementById("pulseButton"),
+  score: document.getElementById("scoreText"),
+  best: document.getElementById("bestText"),
+  coins: document.getElementById("coinText"),
+  panel: document.getElementById("messagePanel"),
+  message: document.getElementById("messageText"),
+  hint: document.getElementById("tapHint"),
 };
 
-const state = {
-  running: false,
-  over: false,
-  score: 0,
-  best: Number(localStorage.getItem("neonRelicBest") || 0),
-  energy: 100,
-  combo: 1,
-  comboTimer: 0,
-  pulse: 1,
-  pulseCooldown: 0,
-  speed: 210,
-  time: 0,
-  spawnTimer: 0,
-  relicTimer: 0,
-  width: 0,
-  height: 0,
+const game = {
+  mode: "ready",
+  w: 0,
+  h: 0,
   dpr: 1,
-  pointer: { active: false, x: 0, y: 0 },
-  ship: { x: 0, y: 0, radius: 18, vx: 0, vy: 0 },
+  time: 0,
+  speed: 355,
+  distance: 0,
+  score: 0,
+  coins: 0,
+  best: Number(localStorage.getItem("neonDashBest") || 0),
+  groundY: 0,
+  gravity: 2300,
+  gravityDir: 1,
+  jumpHeld: false,
+  holdTime: 0,
+  spawnTimer: 0,
+  coinTimer: 0,
+  portalTimer: 0,
+  shake: 0,
+  player: {
+    x: 96,
+    y: 0,
+    size: 32,
+    vy: 0,
+    angle: 0,
+    grounded: true,
+  },
   obstacles: [],
-  relics: [],
+  coinsList: [],
+  portals: [],
   particles: [],
   stars: [],
 };
 
 function resize() {
-  state.dpr = Math.min(window.devicePixelRatio || 1, 2);
-  state.width = Math.floor(window.innerWidth);
-  state.height = Math.floor(window.innerHeight);
-  canvas.width = Math.floor(state.width * state.dpr);
-  canvas.height = Math.floor(state.height * state.dpr);
-  canvas.style.width = `${state.width}px`;
-  canvas.style.height = `${state.height}px`;
-  ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
-  state.ship.x ||= state.width * 0.24;
-  state.ship.y ||= state.height * 0.5;
-  makeStars();
+  game.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  game.w = window.innerWidth;
+  game.h = window.innerHeight;
+  canvas.width = Math.floor(game.w * game.dpr);
+  canvas.height = Math.floor(game.h * game.dpr);
+  canvas.style.width = `${game.w}px`;
+  canvas.style.height = `${game.h}px`;
+  ctx.setTransform(game.dpr, 0, 0, game.dpr, 0, 0);
+  game.groundY = game.h * 0.76;
+  game.player.x = Math.max(78, game.w * 0.18);
+  if (game.mode === "ready") {
+    game.player.y = floorY() - game.player.size;
+  }
+  createStars();
 }
 
-function makeStars() {
-  state.stars = Array.from({ length: Math.max(70, Math.floor(state.width * state.height / 9500)) }, () => ({
-    x: Math.random() * state.width,
-    y: Math.random() * state.height,
-    z: 0.35 + Math.random() * 1.35,
-    r: 0.7 + Math.random() * 1.8,
+function createStars() {
+  const amount = Math.max(60, Math.floor((game.w * game.h) / 10500));
+  game.stars = Array.from({ length: amount }, () => ({
+    x: Math.random() * game.w,
+    y: Math.random() * game.h,
+    z: 0.25 + Math.random() * 1.5,
+    size: 0.7 + Math.random() * 2,
   }));
 }
 
-function resetGame() {
-  state.running = true;
-  state.over = false;
-  state.score = 0;
-  state.energy = 100;
-  state.combo = 1;
-  state.comboTimer = 0;
-  state.pulse = 1;
-  state.pulseCooldown = 0;
-  state.speed = 210;
-  state.time = 0;
-  state.spawnTimer = 0.55;
-  state.relicTimer = 0.35;
-  state.obstacles = [];
-  state.relics = [];
-  state.particles = [];
-  state.ship.x = state.width * 0.24;
-  state.ship.y = state.height * 0.5;
-  ui.startPanel.classList.remove("visible");
-  ui.gameOverPanel.classList.remove("visible");
+function startGame() {
+  game.mode = "playing";
+  game.time = 0;
+  game.speed = 355;
+  game.distance = 0;
+  game.score = 0;
+  game.coins = 0;
+  game.gravityDir = 1;
+  game.jumpHeld = false;
+  game.holdTime = 0;
+  game.spawnTimer = 0.9;
+  game.coinTimer = 1.1;
+  game.portalTimer = 4.5;
+  game.shake = 0;
+  game.obstacles = [];
+  game.coinsList = [];
+  game.portals = [];
+  game.particles = [];
+  game.player.y = floorY() - game.player.size;
+  game.player.vy = 0;
+  game.player.angle = 0;
+  game.player.grounded = true;
+  ui.panel.classList.remove("visible");
+  ui.hint.textContent = "TOQUE PARA PULAR";
 }
 
-function finishGame() {
-  state.running = false;
-  state.over = true;
-  state.best = Math.max(state.best, Math.floor(state.score));
-  localStorage.setItem("neonRelicBest", String(state.best));
-  ui.finalTitle.textContent = state.score > 2500 ? "Piloto lendario" : "Missao encerrada";
-  ui.finalStats.textContent = `Pontuacao: ${Math.floor(state.score)} | Recorde: ${state.best}`;
-  ui.gameOverPanel.classList.add("visible");
+function endGame() {
+  game.mode = "over";
+  game.best = Math.max(game.best, Math.floor(game.score));
+  localStorage.setItem("neonDashBest", String(game.best));
+  ui.message.textContent = `Fim da fase. Pontos: ${Math.floor(game.score)} | Moedas: ${game.coins}. Toque para tentar novamente.`;
+  ui.panel.classList.add("visible");
+  ui.hint.textContent = "TOQUE PARA REINICIAR";
+  burst(game.player.x, game.player.y + game.player.size / 2, "#ff4d7d", 34);
+  game.shake = 18;
+}
+
+function touchStart(event) {
+  event.preventDefault();
+  if (game.mode !== "playing") {
+    startGame();
+    return;
+  }
+  jump();
+  game.jumpHeld = true;
+  game.holdTime = 0;
+}
+
+function touchEnd(event) {
+  event.preventDefault();
+  game.jumpHeld = false;
+  game.holdTime = 0;
+}
+
+function jump() {
+  if (!game.player.grounded) return;
+  game.player.vy = -820 * game.gravityDir;
+  game.player.grounded = false;
+  burst(game.player.x, game.player.y + game.player.size, "#68e4ff", 12);
+}
+
+function floorY() {
+  return game.gravityDir === 1 ? game.groundY : game.h * 0.2;
 }
 
 function spawnObstacle() {
-  const lane = 80 + Math.random() * Math.max(80, state.height - 160);
-  const size = 24 + Math.random() * 24;
-  state.obstacles.push({
-    x: state.width + size,
-    y: lane,
-    radius: size,
-    spin: Math.random() * Math.PI,
-    kind: Math.random() > 0.72 ? "gate" : "drone",
-  });
-}
-
-function spawnRelic() {
-  const drift = Math.sin(state.time * 1.7) * state.height * 0.22;
-  state.relics.push({
-    x: state.width + 28,
-    y: state.height * 0.5 + drift + (Math.random() - 0.5) * 130,
-    radius: 12,
-    value: Math.random() > 0.85 ? 90 : 35,
-    phase: Math.random() * Math.PI * 2,
-  });
-}
-
-function addParticles(x, y, color, count = 10, force = 120) {
-  for (let i = 0; i < count; i += 1) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = force * (0.35 + Math.random());
-    state.particles.push({
-      x,
-      y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life: 0.45 + Math.random() * 0.5,
-      max: 0.95,
-      color,
-      r: 2 + Math.random() * 4,
+  const tall = Math.random() > 0.72;
+  const double = Math.random() > 0.78;
+  const base = floorY();
+  const size = tall ? 46 : 34;
+  const y = game.gravityDir === 1 ? base - size : base;
+  game.obstacles.push({ x: game.w + 50, y, w: size, h: size, type: "spike" });
+  if (double) {
+    game.obstacles.push({
+      x: game.w + 92,
+      y: game.gravityDir === 1 ? base - 30 : base,
+      w: 30,
+      h: 30,
+      type: "spike",
     });
   }
 }
 
-function activatePulse() {
-  if (!state.running || state.pulseCooldown > 0 || state.pulse < 1) return;
-  state.pulse = 0;
-  state.pulseCooldown = 4.4;
-  addParticles(state.ship.x, state.ship.y, "#7dd3fc", 34, 280);
-  state.obstacles = state.obstacles.filter((obstacle) => {
-    const dx = obstacle.x - state.ship.x;
-    const dy = obstacle.y - state.ship.y;
-    const hit = Math.hypot(dx, dy) < 170;
-    if (hit) {
-      state.score += 55 * state.combo;
-      addParticles(obstacle.x, obstacle.y, "#facc15", 18, 190);
-    }
-    return !hit;
-  });
+function spawnCoin() {
+  const arc = 74 + Math.random() * 92;
+  const y = game.gravityDir === 1 ? floorY() - arc : floorY() + arc;
+  game.coinsList.push({ x: game.w + 40, y, r: 12, phase: Math.random() * Math.PI * 2 });
+}
+
+function spawnPortal() {
+  const y = game.h * 0.48;
+  game.portals.push({ x: game.w + 50, y, r: 28, phase: 0 });
 }
 
 function update(dt) {
-  if (!state.running) return;
-  state.time += dt;
-  state.speed += dt * 8.5;
-  state.score += dt * 14 * state.combo;
-  state.energy -= dt * (3.2 + state.time * 0.035);
-  state.comboTimer = Math.max(0, state.comboTimer - dt);
-  if (state.comboTimer === 0) state.combo = 1;
-  if (state.energy <= 0) finishGame();
-
-  const targetX = state.pointer.active ? state.pointer.x : state.width * 0.24;
-  const targetY = state.pointer.active ? state.pointer.y : state.height * 0.5 + Math.sin(state.time * 1.5) * 80;
-  state.ship.vx += (targetX - state.ship.x) * dt * 9;
-  state.ship.vy += (targetY - state.ship.y) * dt * 9;
-  state.ship.vx *= 0.83;
-  state.ship.vy *= 0.83;
-  state.ship.x += state.ship.vx;
-  state.ship.y += state.ship.vy;
-  state.ship.x = clamp(state.ship.x, 28, state.width - 28);
-  state.ship.y = clamp(state.ship.y, 82, state.height - 34);
-
-  state.spawnTimer -= dt;
-  state.relicTimer -= dt;
-  if (state.spawnTimer <= 0) {
-    spawnObstacle();
-    state.spawnTimer = Math.max(0.3, 1.08 - state.time * 0.012 - Math.random() * 0.28);
-  }
-  if (state.relicTimer <= 0) {
-    spawnRelic();
-    state.relicTimer = 0.58 + Math.random() * 0.65;
+  if (game.mode !== "playing") {
+    updateBackground(dt);
+    updateParticles(dt);
+    return;
   }
 
-  for (const star of state.stars) {
-    star.x -= state.speed * dt * star.z * 0.3;
-    if (star.x < -8) {
-      star.x = state.width + 8;
-      star.y = Math.random() * state.height;
-    }
-  }
+  game.time += dt;
+  game.speed += dt * 8;
+  game.distance += game.speed * dt;
+  game.score = game.distance * 0.1 + game.coins * 50;
+  game.shake = Math.max(0, game.shake - dt * 42);
 
-  updateObstacles(dt);
-  updateRelics(dt);
+  updateBackground(dt);
+  updatePlayer(dt);
+  updateSpawns(dt);
+  updateObjects(dt);
   updateParticles(dt);
-  state.pulseCooldown = Math.max(0, state.pulseCooldown - dt);
-  state.pulse = state.pulseCooldown === 0 ? 1 : 1 - state.pulseCooldown / 4.4;
 }
 
-function updateObstacles(dt) {
-  for (const obstacle of state.obstacles) {
-    obstacle.x -= state.speed * dt * (obstacle.kind === "gate" ? 0.8 : 1);
-    obstacle.y += Math.sin(state.time * 2.6 + obstacle.spin) * dt * 24;
-    obstacle.spin += dt * 3;
-    const distance = Math.hypot(obstacle.x - state.ship.x, obstacle.y - state.ship.y);
-    if (distance < obstacle.radius + state.ship.radius * 0.72) {
-      state.energy -= obstacle.kind === "gate" ? 27 : 18;
-      state.combo = 1;
-      state.comboTimer = 0;
-      addParticles(state.ship.x, state.ship.y, "#ff6b7a", 24, 220);
-      obstacle.x = -999;
-      if (state.energy <= 0) finishGame();
-    }
+function updatePlayer(dt) {
+  const holdBoost = game.jumpHeld && game.holdTime < 0.13 && !game.player.grounded;
+  if (holdBoost) {
+    game.player.vy -= 1350 * dt * game.gravityDir;
+    game.holdTime += dt;
   }
-  state.obstacles = state.obstacles.filter((obstacle) => obstacle.x > -120);
+
+  game.player.vy += game.gravity * dt * game.gravityDir;
+  game.player.y += game.player.vy * dt;
+  game.player.angle += (game.player.grounded ? 0.02 : 7.6 * dt) * game.gravityDir;
+
+  const base = floorY();
+  if (game.gravityDir === 1 && game.player.y + game.player.size >= base) {
+    game.player.y = base - game.player.size;
+    game.player.vy = 0;
+    game.player.grounded = true;
+    game.player.angle = Math.round(game.player.angle / (Math.PI / 2)) * (Math.PI / 2);
+  }
+  if (game.gravityDir === -1 && game.player.y <= base) {
+    game.player.y = base;
+    game.player.vy = 0;
+    game.player.grounded = true;
+    game.player.angle = Math.round(game.player.angle / (Math.PI / 2)) * (Math.PI / 2);
+  }
 }
 
-function updateRelics(dt) {
-  for (const relic of state.relics) {
-    relic.x -= state.speed * dt * 1.05;
-    relic.phase += dt * 5;
-    relic.y += Math.sin(relic.phase) * dt * 22;
-    const distance = Math.hypot(relic.x - state.ship.x, relic.y - state.ship.y);
-    if (distance < relic.radius + state.ship.radius) {
-      state.score += relic.value * state.combo;
-      state.energy = Math.min(100, state.energy + 2.5);
-      state.combo = Math.min(9, state.combo + 1);
-      state.comboTimer = 3.2;
-      addParticles(relic.x, relic.y, relic.value > 50 ? "#facc15" : "#5eead4", 16, 170);
-      relic.x = -999;
+function updateSpawns(dt) {
+  game.spawnTimer -= dt;
+  game.coinTimer -= dt;
+  game.portalTimer -= dt;
+
+  if (game.spawnTimer <= 0) {
+    spawnObstacle();
+    game.spawnTimer = Math.max(0.58, 1.25 - game.time * 0.008 + Math.random() * 0.25);
+  }
+  if (game.coinTimer <= 0) {
+    spawnCoin();
+    game.coinTimer = 0.72 + Math.random() * 0.72;
+  }
+  if (game.portalTimer <= 0 && game.time > 8) {
+    spawnPortal();
+    game.portalTimer = 7 + Math.random() * 4;
+  }
+}
+
+function updateObjects(dt) {
+  const move = game.speed * dt;
+  for (const obstacle of game.obstacles) {
+    obstacle.x -= move;
+    if (boxHit(playerBox(), obstacle)) {
+      endGame();
+      return;
     }
   }
-  state.relics = state.relics.filter((relic) => relic.x > -80);
+
+  for (const coin of game.coinsList) {
+    coin.x -= move;
+    coin.phase += dt * 6;
+    if (circleBoxHit(coin, playerBox())) {
+      const collectedX = coin.x;
+      const collectedY = coin.y;
+      coin.x = -999;
+      game.coins += 1;
+      burst(collectedX, collectedY, "#f8d748", 15);
+    }
+  }
+
+  for (const portal of game.portals) {
+    portal.x -= move;
+    portal.phase += dt * 5;
+    if (circleBoxHit(portal, playerBox())) {
+      portal.x = -999;
+      game.gravityDir *= -1;
+      game.player.vy = -520 * game.gravityDir;
+      game.player.grounded = false;
+      burst(game.player.x, game.player.y, "#b983ff", 26);
+    }
+  }
+
+  game.obstacles = game.obstacles.filter((item) => item.x > -80);
+  game.coinsList = game.coinsList.filter((item) => item.x > -80);
+  game.portals = game.portals.filter((item) => item.x > -90);
+}
+
+function updateBackground(dt) {
+  for (const star of game.stars) {
+    star.x -= game.speed * dt * star.z * 0.18;
+    if (star.x < -8) {
+      star.x = game.w + 8;
+      star.y = Math.random() * game.h;
+    }
+  }
 }
 
 function updateParticles(dt) {
-  for (const particle of state.particles) {
-    particle.x += particle.vx * dt;
-    particle.y += particle.vy * dt;
-    particle.vx *= 0.94;
-    particle.vy *= 0.94;
-    particle.life -= dt;
+  for (const p of game.particles) {
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vx *= 0.94;
+    p.vy *= 0.94;
+    p.life -= dt;
   }
-  state.particles = state.particles.filter((particle) => particle.life > 0);
+  game.particles = game.particles.filter((p) => p.life > 0);
+}
+
+function playerBox() {
+  const pad = 6;
+  return {
+    x: game.player.x + pad,
+    y: game.player.y + pad,
+    w: game.player.size - pad * 2,
+    h: game.player.size - pad * 2,
+  };
+}
+
+function boxHit(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function circleBoxHit(circle, box) {
+  const x = clamp(circle.x, box.x, box.x + box.w);
+  const y = clamp(circle.y, box.y, box.y + box.h);
+  return Math.hypot(circle.x - x, circle.y - y) < circle.r;
+}
+
+function burst(x, y, color, count) {
+  for (let i = 0; i < count; i += 1) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 80 + Math.random() * 260;
+    game.particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: 2 + Math.random() * 4,
+      life: 0.45 + Math.random() * 0.5,
+      color,
+    });
+  }
 }
 
 function draw() {
-  ctx.clearRect(0, 0, state.width, state.height);
+  ctx.clearRect(0, 0, game.w, game.h);
+  const sx = game.shake ? (Math.random() - 0.5) * game.shake : 0;
+  const sy = game.shake ? (Math.random() - 0.5) * game.shake : 0;
+  ctx.save();
+  ctx.translate(sx, sy);
   drawBackground();
-  drawRelics();
+  drawTrack();
+  drawCoins();
+  drawPortals();
   drawObstacles();
-  drawShip();
+  drawPlayer();
   drawParticles();
-  drawPulseRing();
+  ctx.restore();
   updateHud();
-  requestAnimationFrame(loop);
 }
 
 function drawBackground() {
-  const grd = ctx.createLinearGradient(0, 0, state.width, state.height);
-  grd.addColorStop(0, "#07131f");
-  grd.addColorStop(0.48, "#101827");
-  grd.addColorStop(1, "#060b15");
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, state.width, state.height);
+  const gradient = ctx.createLinearGradient(0, 0, game.w, game.h);
+  gradient.addColorStop(0, "#07121f");
+  gradient.addColorStop(0.52, "#111a29");
+  gradient.addColorStop(1, "#070b13");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, game.w, game.h);
 
   ctx.save();
-  ctx.strokeStyle = "rgba(125, 211, 252, 0.12)";
+  for (const star of game.stars) {
+    ctx.globalAlpha = 0.32 + star.z * 0.22;
+    ctx.fillStyle = star.z > 1.2 ? "#f8d748" : "#83e9ff";
+    ctx.fillRect(star.x, star.y, star.size * 8, star.size);
+  }
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = "rgba(104, 228, 255, 0.11)";
   ctx.lineWidth = 1;
-  const gap = 44;
-  const offset = (state.time * state.speed * 0.18) % gap;
-  for (let x = -gap + offset; x < state.width + gap; x += gap) {
+  const gap = 46;
+  const offset = -(game.distance * 0.18) % gap;
+  for (let x = offset; x < game.w + gap; x += gap) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
-    ctx.lineTo(x - state.height * 0.28, state.height);
+    ctx.lineTo(x - game.h * 0.32, game.h);
     ctx.stroke();
-  }
-  for (const star of state.stars) {
-    ctx.globalAlpha = 0.35 + star.z * 0.28;
-    ctx.fillStyle = star.z > 1.2 ? "#f8d748" : "#98e8ff";
-    ctx.beginPath();
-    ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-    ctx.fill();
   }
   ctx.restore();
 }
 
-function drawShip() {
-  const { x, y } = state.ship;
+function drawTrack() {
+  drawPlatform(game.groundY, 1);
+  drawPlatform(game.h * 0.2, -1);
+}
+
+function drawPlatform(y, dir) {
   ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(clamp(state.ship.vy / 170, -0.55, 0.55));
-  ctx.shadowBlur = 26;
-  ctx.shadowColor = "#68e4ff";
-  ctx.fillStyle = "#dff9ff";
+  ctx.strokeStyle = dir === 1 ? "#68e4ff" : "#b983ff";
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = ctx.strokeStyle;
+  ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.moveTo(25, 0);
-  ctx.lineTo(-18, -16);
-  ctx.lineTo(-10, 0);
-  ctx.lineTo(-18, 16);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(0, y);
+  ctx.lineTo(game.w, y);
+  ctx.stroke();
   ctx.shadowBlur = 0;
-  ctx.fillStyle = "#00c2ff";
-  ctx.beginPath();
-  ctx.ellipse(-4, 0, 11, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "rgba(255, 106, 182, 0.72)";
-  ctx.beginPath();
-  ctx.moveTo(-18, -7);
-  ctx.lineTo(-42 - Math.random() * 10, 0);
-  ctx.lineTo(-18, 7);
-  ctx.closePath();
-  ctx.fill();
+  ctx.fillStyle = dir === 1 ? "rgba(104, 228, 255, 0.08)" : "rgba(185, 131, 255, 0.06)";
+  ctx.fillRect(0, dir === 1 ? y : 0, game.w, dir === 1 ? game.h - y : y);
+
+  const tile = 36;
+  const offset = -(game.distance * 0.42) % tile;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.13)";
+  ctx.lineWidth = 1;
+  for (let x = offset; x < game.w + tile; x += tile) {
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 18, y + 18 * dir);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawPlayer() {
+  const p = game.player;
+  ctx.save();
+  ctx.translate(p.x + p.size / 2, p.y + p.size / 2);
+  ctx.rotate(p.angle);
+  ctx.shadowBlur = 26;
+  ctx.shadowColor = "#67e8f9";
+  ctx.fillStyle = "#e9fbff";
+  ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#08121d";
+  ctx.fillRect(-8, -8, 6, 6);
+  ctx.fillRect(4, -8, 6, 6);
+  ctx.fillStyle = "#ff4dab";
+  ctx.fillRect(-10, 7, 20, 5);
   ctx.restore();
 }
 
 function drawObstacles() {
-  for (const obstacle of state.obstacles) {
+  for (const o of game.obstacles) {
     ctx.save();
-    ctx.translate(obstacle.x, obstacle.y);
-    ctx.rotate(obstacle.spin);
-    ctx.shadowBlur = 24;
-    ctx.shadowColor = obstacle.kind === "gate" ? "#ff6b7a" : "#f472b6";
-    ctx.strokeStyle = obstacle.kind === "gate" ? "#ff8c6b" : "#ff6ab6";
-    ctx.lineWidth = 4;
+    ctx.translate(o.x, o.y);
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "#ff4d7d";
+    ctx.fillStyle = "#ff4d7d";
     ctx.beginPath();
-    const sides = obstacle.kind === "gate" ? 6 : 4;
-    for (let i = 0; i <= sides; i += 1) {
-      const a = (i / sides) * Math.PI * 2;
-      const r = obstacle.radius * (i % 2 ? 0.72 : 1);
-      const x = Math.cos(a) * r;
-      const y = Math.sin(a) * r;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
-}
-
-function drawRelics() {
-  for (const relic of state.relics) {
-    ctx.save();
-    ctx.translate(relic.x, relic.y);
-    ctx.rotate(relic.phase);
-    ctx.shadowBlur = 22;
-    ctx.shadowColor = relic.value > 50 ? "#facc15" : "#5eead4";
-    ctx.fillStyle = relic.value > 50 ? "#f8d748" : "#5eead4";
-    ctx.beginPath();
-    for (let i = 0; i < 8; i += 1) {
-      const a = (i / 8) * Math.PI * 2;
-      const r = i % 2 ? relic.radius * 0.48 : relic.radius;
-      const x = Math.cos(a) * r;
-      const y = Math.sin(a) * r;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+    if (game.gravityDir === 1) {
+      ctx.moveTo(0, o.h);
+      ctx.lineTo(o.w / 2, 0);
+      ctx.lineTo(o.w, o.h);
+    } else {
+      ctx.moveTo(0, 0);
+      ctx.lineTo(o.w / 2, o.h);
+      ctx.lineTo(o.w, 0);
     }
     ctx.closePath();
     ctx.fill();
@@ -365,44 +445,60 @@ function drawRelics() {
   }
 }
 
-function drawParticles() {
-  for (const particle of state.particles) {
-    ctx.globalAlpha = Math.max(0, particle.life / particle.max);
-    ctx.fillStyle = particle.color;
+function drawCoins() {
+  for (const coin of game.coinsList) {
+    ctx.save();
+    ctx.translate(coin.x, coin.y);
+    ctx.rotate(coin.phase);
+    ctx.shadowBlur = 22;
+    ctx.shadowColor = "#f8d748";
+    ctx.strokeStyle = "#f8d748";
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.arc(particle.x, particle.y, particle.r, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, coin.r, coin.r * 0.7, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawPortals() {
+  for (const portal of game.portals) {
+    ctx.save();
+    ctx.translate(portal.x, portal.y);
+    ctx.rotate(portal.phase);
+    ctx.shadowBlur = 24;
+    ctx.shadowColor = "#b983ff";
+    ctx.strokeStyle = "#b983ff";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(0, 0, portal.r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "#68e4ff";
+    ctx.beginPath();
+    ctx.moveTo(-portal.r, 0);
+    ctx.lineTo(portal.r, 0);
+    ctx.moveTo(0, -portal.r);
+    ctx.lineTo(0, portal.r);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawParticles() {
+  for (const p of game.particles) {
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
 }
 
-function drawPulseRing() {
-  if (state.pulseCooldown <= 0) return;
-  const radius = 170 * (1 - state.pulse);
-  ctx.save();
-  ctx.strokeStyle = `rgba(125, 211, 252, ${0.34 * (1 - state.pulse)})`;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(state.ship.x, state.ship.y, radius, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-}
-
 function updateHud() {
-  ui.energyText.textContent = `${Math.max(0, Math.ceil(state.energy))}`;
-  ui.energyBar.style.width = `${clamp(state.energy, 0, 100)}%`;
-  ui.scoreText.textContent = `${Math.floor(state.score)}`;
-  ui.comboText.textContent = `x${state.combo}`;
-  ui.comboBar.style.width = `${(state.comboTimer / 3.2) * 100}%`;
-  ui.pulseButton.classList.toggle("ready", state.running && state.pulseCooldown === 0);
-}
-
-function setPointer(event, active = true) {
-  event.preventDefault();
-  const touch = event.touches?.[0] || event.changedTouches?.[0] || event;
-  state.pointer.active = active;
-  state.pointer.x = touch.clientX;
-  state.pointer.y = touch.clientY;
+  ui.score.textContent = Math.floor(game.score);
+  ui.best.textContent = game.best;
+  ui.coins.textContent = game.coins;
 }
 
 function clamp(value, min, max) {
@@ -415,37 +511,27 @@ function loop(now = performance.now()) {
   last = now;
   update(dt);
   draw();
+  requestAnimationFrame(loop);
 }
 
 window.addEventListener("resize", resize);
-canvas.addEventListener("pointerdown", (event) => {
-  canvas.setPointerCapture?.(event.pointerId);
-  setPointer(event, true);
-});
-canvas.addEventListener("pointermove", (event) => state.pointer.active && setPointer(event, true));
-canvas.addEventListener("pointerup", (event) => {
-  event.preventDefault();
-  state.pointer.active = false;
-});
-canvas.addEventListener("pointercancel", (event) => {
-  event.preventDefault();
-  state.pointer.active = false;
-});
-canvas.addEventListener("touchstart", (event) => setPointer(event, true), { passive: false });
-canvas.addEventListener("touchmove", (event) => state.pointer.active && setPointer(event, true), {
-  passive: false,
-});
-canvas.addEventListener("touchend", (event) => {
-  event.preventDefault();
-  state.pointer.active = false;
-});
-ui.startButton.addEventListener("click", resetGame);
-ui.restartButton.addEventListener("click", resetGame);
-ui.pulseButton.addEventListener("click", activatePulse);
+if (window.PointerEvent) {
+  window.addEventListener("pointerdown", touchStart, { passive: false });
+  window.addEventListener("pointerup", touchEnd, { passive: false });
+  window.addEventListener("pointercancel", touchEnd, { passive: false });
+} else {
+  window.addEventListener("touchstart", touchStart, { passive: false });
+  window.addEventListener("touchend", touchEnd, { passive: false });
+  window.addEventListener("touchcancel", touchEnd, { passive: false });
+  window.addEventListener("mousedown", touchStart);
+  window.addEventListener("mouseup", touchEnd);
+}
 window.addEventListener("keydown", (event) => {
-  if (event.code === "Space") activatePulse();
-  if (event.code === "Enter" && !state.running) resetGame();
+  if (event.code === "Space" || event.code === "Enter") {
+    touchStart(event);
+  }
 });
 
+ui.best.textContent = game.best;
 resize();
-draw();
+loop();
