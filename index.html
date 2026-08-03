@@ -32,6 +32,16 @@
         <p id="messageText">Toque em qualquer lugar para iniciar. Toque para pular.</p>
       </section>
 
+      <button
+        id="touchCatcher"
+        class="touch-catcher"
+        type="button"
+        aria-label="Controle de toque"
+        ontouchstart="window.neonDashPress && window.neonDashPress(event)"
+        ontouchend="window.neonDashRelease && window.neonDashRelease(event)"
+        onclick="window.neonDashPress && window.neonDashPress(event)"
+      ></button>
+
       <div class="tap-zone">
         <span id="tapHint">TOQUE PARA PULAR</span>
       </div>

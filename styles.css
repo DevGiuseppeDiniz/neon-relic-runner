@@ -41,8 +41,25 @@ body {
   touch-action: none;
 }
 
+.touch-catcher {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
 .hud {
   position: absolute;
+  z-index: 8;
   top: max(12px, env(safe-area-inset-top));
   left: max(10px, env(safe-area-inset-left));
   right: max(10px, env(safe-area-inset-right));
@@ -80,6 +97,7 @@ body {
 
 .message-panel {
   position: absolute;
+  z-index: 8;
   left: 50%;
   top: 42%;
   width: min(88vw, 480px);
@@ -125,6 +143,7 @@ h1 {
 
 .tap-zone {
   position: absolute;
+  z-index: 9;
   left: 0;
   right: 0;
   bottom: max(18px, env(safe-area-inset-bottom));

@@ -8,6 +8,7 @@ const ui = {
   panel: document.getElementById("messagePanel"),
   message: document.getElementById("messageText"),
   hint: document.getElementById("tapHint"),
+  touchCatcher: document.getElementById("touchCatcher"),
 };
 
 const game = {
@@ -22,7 +23,8 @@ const game = {
   coins: 0,
   best: Number(localStorage.getItem("neonDashBest") || 0),
   groundY: 0,
-  gravity: 2300,
+  ceilingY: 0,
+  gravity: 2100,
   gravityDir: 1,
   jumpHeld: false,
   holdTime: 0,
@@ -56,8 +58,10 @@ function resize() {
   canvas.style.width = `${game.w}px`;
   canvas.style.height = `${game.h}px`;
   ctx.setTransform(game.dpr, 0, 0, game.dpr, 0, 0);
-  game.groundY = game.h * 0.76;
-  game.player.x = Math.max(78, game.w * 0.18);
+  game.groundY = game.h * 0.78;
+  game.ceilingY = game.h * 0.21;
+  game.player.size = clamp(Math.round(Math.min(game.w, game.h) * 0.082), 26, 34);
+  game.player.x = clamp(game.w * 0.2, 72, 108);
   if (game.mode === "ready") {
     game.player.y = floorY() - game.player.size;
   }
@@ -77,7 +81,7 @@ function createStars() {
 function startGame() {
   game.mode = "playing";
   game.time = 0;
-  game.speed = 355;
+  game.speed = clamp(game.w * 0.95, 300, 380);
   game.distance = 0;
   game.score = 0;
   game.coins = 0;
@@ -114,7 +118,8 @@ function endGame() {
 function touchStart(event) {
   blockBrowserGesture(event);
   const now = performance.now();
-  if (now - game.lastPressAt < 90) return;
+  if (event?.type === "click" && now - game.lastPressAt < 520) return;
+  if (now - game.lastPressAt < 55) return;
   game.lastPressAt = now;
   if (game.mode !== "playing") {
     startGame();
@@ -128,7 +133,7 @@ function touchStart(event) {
 function touchEnd(event) {
   blockBrowserGesture(event);
   const now = performance.now();
-  if (now - game.lastReleaseAt < 90) return;
+  if (now - game.lastReleaseAt < 45) return;
   game.lastReleaseAt = now;
   game.jumpHeld = false;
   game.holdTime = 0;
@@ -140,42 +145,115 @@ function blockBrowserGesture(event) {
 
 function jump() {
   if (!game.player.grounded) return;
-  game.player.vy = -820 * game.gravityDir;
+  game.player.vy = -780 * game.gravityDir;
   game.player.grounded = false;
   burst(game.player.x, game.player.y + game.player.size, "#68e4ff", 12);
 }
 
 function floorY() {
-  return game.gravityDir === 1 ? game.groundY : game.h * 0.2;
+  return game.gravityDir === 1 ? game.groundY : game.ceilingY;
 }
 
 function spawnObstacle() {
-  const tall = Math.random() > 0.72;
-  const double = Math.random() > 0.78;
+  const pattern = Math.random();
+  if (pattern < 0.34) {
+    spawnSpikeRow(1 + Math.floor(Math.random() * 3));
+    return;
+  }
+  if (pattern < 0.58) {
+    spawnBlockAndSpike();
+    return;
+  }
+  if (pattern < 0.78) {
+    spawnSaw();
+    return;
+  }
+  spawnGate();
+}
+
+function spawnSpikeRow(count) {
   const base = floorY();
-  const size = tall ? 46 : 34;
-  const y = game.gravityDir === 1 ? base - size : base;
-  game.obstacles.push({ x: game.w + 50, y, w: size, h: size, type: "spike" });
-  if (double) {
+  const size = clamp(game.player.size * 0.92, 24, 32);
+  for (let i = 0; i < count; i += 1) {
     game.obstacles.push({
-      x: game.w + 92,
-      y: game.gravityDir === 1 ? base - 30 : base,
-      w: 30,
-      h: 30,
+      x: game.w + 44 + i * (size * 0.88),
+      y: game.gravityDir === 1 ? base - size : base,
+      w: size,
+      h: size,
       type: "spike",
     });
   }
 }
 
+function spawnBlockAndSpike() {
+  const base = floorY();
+  const block = clamp(game.player.size * 1.05, 30, 38);
+  const gap = clamp(game.player.size * 2.55, 76, 96);
+  const floatingY =
+    game.gravityDir === 1 ? base - gap - block : base + gap;
+  game.obstacles.push({
+    x: game.w + 46,
+    y: floatingY,
+    w: block * 1.55,
+    h: block,
+    type: "block",
+  });
+  game.obstacles.push({
+    x: game.w + 118,
+    y: game.gravityDir === 1 ? base - block * 0.86 : base,
+    w: block * 0.86,
+    h: block * 0.86,
+    type: "spike",
+  });
+}
+
+function spawnSaw() {
+  const base = floorY();
+  const r = clamp(game.player.size * 0.65, 18, 24);
+  const lift = clamp(game.player.size * 2.25, 66, 82);
+  game.obstacles.push({
+    x: game.w + 56,
+    y: game.gravityDir === 1 ? base - lift : base + lift,
+    r,
+    phase: Math.random() * Math.PI * 2,
+    type: "saw",
+  });
+}
+
+function spawnGate() {
+  const base = floorY();
+  const size = clamp(game.player.size * 0.9, 24, 31);
+  spawnSpikeRow(1);
+  game.obstacles.push({
+    x: game.w + 142,
+    y: game.gravityDir === 1 ? base - size * 2.9 : base + size * 1.9,
+    w: size * 1.35,
+    h: size * 1.35,
+    type: "block",
+  });
+  game.obstacles.push({
+    x: game.w + 208,
+    y: game.gravityDir === 1 ? base - size : base,
+    w: size,
+    h: size,
+    type: "spike",
+  });
+}
+
 function spawnCoin() {
-  const arc = 74 + Math.random() * 92;
+  const arc = clamp(game.player.size * (2.1 + Math.random() * 1.6), 58, 116);
   const y = game.gravityDir === 1 ? floorY() - arc : floorY() + arc;
-  game.coinsList.push({ x: game.w + 40, y, r: 12, phase: Math.random() * Math.PI * 2 });
+  game.coinsList.push({
+    x: game.w + 40,
+    y,
+    r: clamp(game.player.size * 0.32, 9, 12),
+    phase: Math.random() * Math.PI * 2,
+  });
 }
 
 function spawnPortal() {
   const y = game.h * 0.48;
-  game.portals.push({ x: game.w + 50, y, r: 28, phase: 0 });
+  game.portals.push({ x: game.w + 50, y, r: clamp(game.player.size * 0.82, 22, 28), phase: 0 });
 }
 
 function update(dt) {
@@ -186,7 +264,7 @@ function update(dt) {
   }
 
   game.time += dt;
-  game.speed += dt * 8;
+  game.speed += dt * 7;
   game.distance += game.speed * dt;
   game.score = game.distance * 0.1 + game.coins * 50;
   game.shake = Math.max(0, game.shake - dt * 42);
@@ -201,7 +279,7 @@ function update(dt) {
 function updatePlayer(dt) {
   const holdBoost = game.jumpHeld && game.holdTime < 0.13 && !game.player.grounded;
   if (holdBoost) {
-    game.player.vy -= 1350 * dt * game.gravityDir;
+    game.player.vy -= 1250 * dt * game.gravityDir;
     game.holdTime += dt;
   }
 
@@ -247,7 +325,8 @@ function updateObjects(dt) {
   const move = game.speed * dt;
   for (const obstacle of game.obstacles) {
     obstacle.x -= move;
-    if (boxHit(playerBox(), obstacle)) {
+    obstacle.phase = (obstacle.phase || 0) + dt * 6;
+    if (obstacleHit(obstacle)) {
       endGame();
       return;
     }
@@ -277,7 +356,7 @@ function updateObjects(dt) {
     }
   }
 
-  game.obstacles = game.obstacles.filter((item) => item.x > -80);
+  game.obstacles = game.obstacles.filter((item) => item.x > -110);
   game.coinsList = game.coinsList.filter((item) => item.x > -80);
   game.portals = game.portals.filter((item) => item.x > -90);
 }
@@ -304,13 +383,30 @@ function updateParticles(dt) {
 }
 
 function playerBox() {
-  const pad = 6;
+  const pad = Math.max(4, game.player.size * 0.18);
   return {
     x: game.player.x + pad,
     y: game.player.y + pad,
     w: game.player.size - pad * 2,
     h: game.player.size - pad * 2,
   };
+}
+
+function obstacleHit(obstacle) {
+  const box = playerBox();
+  if (obstacle.type === "saw") {
+    return circleBoxHit({ x: obstacle.x, y: obstacle.y, r: obstacle.r * 0.78 }, box);
+  }
+  if (obstacle.type === "spike") {
+    const spikeBox = {
+      x: obstacle.x + obstacle.w * 0.18,
+      y: obstacle.y + obstacle.h * 0.18,
+      w: obstacle.w * 0.64,
+      h: obstacle.h * 0.68,
+    };
+    return boxHit(box, spikeBox);
+  }
+  return boxHit(box, obstacle);
 }
 
 function boxHit(a, b) {
@@ -437,24 +533,62 @@ function drawPlayer() {
 function drawObstacles() {
   for (const o of game.obstacles) {
     ctx.save();
-    ctx.translate(o.x, o.y);
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = "#ff4d7d";
-    ctx.fillStyle = "#ff4d7d";
-    ctx.beginPath();
-    if (game.gravityDir === 1) {
-      ctx.moveTo(0, o.h);
-      ctx.lineTo(o.w / 2, 0);
-      ctx.lineTo(o.w, o.h);
-    } else {
-      ctx.moveTo(0, 0);
-      ctx.lineTo(o.w / 2, o.h);
-      ctx.lineTo(o.w, 0);
+    if (o.type === "saw") {
+      drawSaw(o);
+      ctx.restore();
+      continue;
     }
-    ctx.closePath();
-    ctx.fill();
+    ctx.translate(o.x, o.y);
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = o.type === "block" ? "#f8d748" : "#ff4d7d";
+    if (o.type === "block") {
+      ctx.fillStyle = "#f8d748";
+      ctx.fillRect(0, 0, o.w, o.h);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "rgba(8, 18, 29, 0.34)";
+      ctx.fillRect(5, 5, Math.max(4, o.w - 10), Math.max(4, o.h - 10));
+    } else {
+      ctx.fillStyle = "#ff4d7d";
+      ctx.beginPath();
+      if (game.gravityDir === 1) {
+        ctx.moveTo(0, o.h);
+        ctx.lineTo(o.w / 2, 0);
+        ctx.lineTo(o.w, o.h);
+      } else {
+        ctx.moveTo(0, 0);
+        ctx.lineTo(o.w / 2, o.h);
+        ctx.lineTo(o.w, 0);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
     ctx.restore();
   }
+}
+
+function drawSaw(o) {
+  ctx.translate(o.x, o.y);
+  ctx.rotate(o.phase);
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = "#ff7a45";
+  ctx.fillStyle = "#ff7a45";
+  ctx.beginPath();
+  const teeth = 14;
+  for (let i = 0; i <= teeth; i += 1) {
+    const angle = (i / teeth) * Math.PI * 2;
+    const radius = i % 2 ? o.r * 0.68 : o.r;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#101927";
+  ctx.beginPath();
+  ctx.arc(0, 0, o.r * 0.32, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawCoins() {
@@ -538,8 +672,11 @@ function bindTouchControls(target) {
   target.addEventListener("click", touchStart);
 }
 
+window.neonDashPress = touchStart;
+window.neonDashRelease = touchEnd;
 window.addEventListener("resize", resize);
 bindTouchControls(canvas);
+bindTouchControls(ui.touchCatcher);
 bindTouchControls(document);
 bindTouchControls(window);
 window.addEventListener("keydown", (event) => {
