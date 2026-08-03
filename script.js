@@ -43,6 +43,8 @@ const game = {
   portals: [],
   particles: [],
   stars: [],
+  lastPressAt: 0,
+  lastReleaseAt: 0,
 };
 
 function resize() {
@@ -110,7 +112,10 @@ function endGame() {
 }
 
 function touchStart(event) {
-  event.preventDefault();
+  blockBrowserGesture(event);
+  const now = performance.now();
+  if (now - game.lastPressAt < 90) return;
+  game.lastPressAt = now;
   if (game.mode !== "playing") {
     startGame();
     return;
@@ -121,9 +126,16 @@ function touchStart(event) {
 }
 
 function touchEnd(event) {
-  event.preventDefault();
+  blockBrowserGesture(event);
+  const now = performance.now();
+  if (now - game.lastReleaseAt < 90) return;
+  game.lastReleaseAt = now;
   game.jumpHeld = false;
   game.holdTime = 0;
+}
+
+function blockBrowserGesture(event) {
+  if (event?.cancelable) event.preventDefault();
 }
 
 function jump() {
@@ -514,18 +526,22 @@ function loop(now = performance.now()) {
   requestAnimationFrame(loop);
 }
 
-window.addEventListener("resize", resize);
-if (window.PointerEvent) {
-  window.addEventListener("pointerdown", touchStart, { passive: false });
-  window.addEventListener("pointerup", touchEnd, { passive: false });
-  window.addEventListener("pointercancel", touchEnd, { passive: false });
-} else {
-  window.addEventListener("touchstart", touchStart, { passive: false });
-  window.addEventListener("touchend", touchEnd, { passive: false });
-  window.addEventListener("touchcancel", touchEnd, { passive: false });
-  window.addEventListener("mousedown", touchStart);
-  window.addEventListener("mouseup", touchEnd);
+function bindTouchControls(target) {
+  target.addEventListener("touchstart", touchStart, { passive: false });
+  target.addEventListener("touchend", touchEnd, { passive: false });
+  target.addEventListener("touchcancel", touchEnd, { passive: false });
+  target.addEventListener("pointerdown", touchStart, { passive: false });
+  target.addEventListener("pointerup", touchEnd, { passive: false });
+  target.addEventListener("pointercancel", touchEnd, { passive: false });
+  target.addEventListener("mousedown", touchStart);
+  target.addEventListener("mouseup", touchEnd);
+  target.addEventListener("click", touchStart);
 }
+
+window.addEventListener("resize", resize);
+bindTouchControls(canvas);
+bindTouchControls(document);
+bindTouchControls(window);
 window.addEventListener("keydown", (event) => {
   if (event.code === "Space" || event.code === "Enter") {
     touchStart(event);
