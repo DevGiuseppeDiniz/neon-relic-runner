@@ -9,12 +9,6 @@ const ui = {
   message: document.getElementById("messageText"),
   hint: document.getElementById("tapHint"),
   touchCatcher: document.getElementById("touchCatcher"),
-  debugPanel: document.getElementById("debugPanel"),
-  debugBridge: document.getElementById("debugBridge"),
-  debugCommand: document.getElementById("debugCommand"),
-  debugInput: document.getElementById("debugInput"),
-  debugScript: document.getElementById("debugScript"),
-  debugTick: document.getElementById("debugTick"),
 };
 
 const game = {
@@ -54,14 +48,6 @@ const game = {
   stars: [],
   lastPressAt: 0,
   lastReleaseAt: 0,
-  lastBridgeCommand: "",
-  lastHashCommand: "",
-  lastUrlCommand: "",
-  debug: true,
-  debugInput: "nenhum",
-  debugBridge: "aguardando",
-  debugCommand: "nenhum",
-  tick: 0,
 };
 
 function resize() {
@@ -134,7 +120,6 @@ function endGame() {
 function touchStart(event) {
   blockBrowserGesture(event);
   const now = performance.now();
-  game.debugInput = `${event?.type || "unknown"} down ${Math.floor(now)}`;
   if (event?.type === "click" && now - game.lastPressAt < 520) return;
   if (now - game.lastPressAt < 55) return;
   game.lastPressAt = now;
@@ -150,71 +135,10 @@ function touchStart(event) {
 function touchEnd(event) {
   blockBrowserGesture(event);
   const now = performance.now();
-  game.debugInput = `${event?.type || "unknown"} up ${Math.floor(now)}`;
   if (now - game.lastReleaseAt < 45) return;
   game.lastReleaseAt = now;
   game.jumpHeld = false;
   game.holdTime = 0;
-}
-
-function handleBridgeCommand(rawCommand) {
-  if (!rawCommand || rawCommand === game.lastBridgeCommand) return;
-  game.lastBridgeCommand = rawCommand;
-  game.debugCommand = String(rawCommand);
-  const command = String(rawCommand).split(":")[0].toLowerCase().trim();
-  if (command === "down" || command === "tap" || command === "jump" || command === "start") {
-    touchStart({ type: "appinventor", cancelable: false });
-  }
-  if (command === "up" || command === "release") {
-    touchEnd({ type: "appinventor", cancelable: false });
-  }
-}
-
-function pollAppInventorBridge() {
-  try {
-    const bridge = window.AppInventor || globalThis.AppInventor;
-    if (bridge?.getWebViewString) {
-      game.debugBridge = "AppInventor.getWebViewString OK";
-      handleBridgeCommand(bridge.getWebViewString());
-      return;
-    }
-    game.debugBridge = bridge ? "AppInventor sem getWebViewString" : "AppInventor ausente";
-  } catch {
-    game.debugBridge = "erro ao ler AppInventor";
-    // Some browsers expose no App Inventor bridge outside the APK.
-  }
-}
-
-function pollHashBridge() {
-  const hash = window.location.hash.replace(/^#/, "");
-  if (!hash || hash === game.lastHashCommand) return;
-  game.lastHashCommand = hash;
-  if (hash.toLowerCase().startsWith("tap") || hash.toLowerCase().startsWith("jump")) {
-    game.debugCommand = `hash:${hash}`;
-    touchStart({ type: "hash", cancelable: false });
-    touchEnd({ type: "hash", cancelable: false });
-  }
-}
-
-function pollUrlCommandBridge() {
-  const params = new URLSearchParams(window.location.search);
-  const command = params.get("cmd") || params.get("tap") || "";
-  const nonce = params.get("n") || "";
-  const key = `${command}:${nonce}`;
-  if (!command || key === game.lastUrlCommand) return;
-  game.lastUrlCommand = key;
-  if (command.toLowerCase().startsWith("tap") || command.toLowerCase().startsWith("jump")) {
-    game.debugCommand = `url:${key}`;
-    touchStart({ type: "url", cancelable: false });
-    touchEnd({ type: "url", cancelable: false });
-  }
-}
-
-function runInitialHashCommand() {
-  game.lastHashCommand = "";
-  pollHashBridge();
-  game.lastUrlCommand = "";
-  pollUrlCommandBridge();
 }
 
 function blockBrowserGesture(event) {
@@ -814,15 +738,6 @@ function updateHud() {
   ui.score.textContent = Math.floor(game.score);
   ui.best.textContent = game.best;
   ui.coins.textContent = game.coins;
-  game.tick += 1;
-  if (game.debug) {
-    ui.debugPanel.classList.add("visible");
-    ui.debugScript.textContent = `script: externo OK inline ${window.__neonInlineLoaded ? "OK" : "NAO"}`;
-    ui.debugBridge.textContent = `bridge: ${game.debugBridge}`;
-    ui.debugCommand.textContent = `command: ${game.debugCommand}`;
-    ui.debugInput.textContent = `input: ${game.debugInput}`;
-    ui.debugTick.textContent = `tick: ${game.tick}`;
-  }
 }
 
 function clamp(value, min, max) {
@@ -833,9 +748,6 @@ let last = performance.now();
 function loop(now = performance.now()) {
   const dt = Math.min(0.033, (now - last) / 1000);
   last = now;
-  pollAppInventorBridge();
-  pollHashBridge();
-  pollUrlCommandBridge();
   update(dt);
   draw();
 }
@@ -854,7 +766,6 @@ function bindTouchControls(target) {
 
 window.neonDashPress = touchStart;
 window.neonDashRelease = touchEnd;
-window.neonDashCommand = handleBridgeCommand;
 window.addEventListener("resize", resize);
 bindTouchControls(canvas);
 bindTouchControls(ui.touchCatcher);
@@ -868,7 +779,5 @@ window.addEventListener("keydown", (event) => {
 
 ui.best.textContent = game.best;
 resize();
-startGame();
-runInitialHashCommand();
 loop();
 setInterval(() => loop(performance.now()), 1000 / 60);
