@@ -53,7 +53,7 @@ const game = {
   lastPressAt: 0,
   lastReleaseAt: 0,
   lastBridgeCommand: "",
-  debug: new URLSearchParams(window.location.search).has("debug"),
+  debug: true,
   debugInput: "nenhum",
   debugBridge: "aguardando",
   debugCommand: "nenhum",
