@@ -54,6 +54,7 @@ const game = {
   lastReleaseAt: 0,
   lastBridgeCommand: "",
   lastHashCommand: "",
+  lastUrlCommand: "",
   debug: true,
   debugInput: "nenhum",
   debugBridge: "aguardando",
@@ -192,9 +193,25 @@ function pollHashBridge() {
   }
 }
 
+function pollUrlCommandBridge() {
+  const params = new URLSearchParams(window.location.search);
+  const command = params.get("cmd") || params.get("tap") || "";
+  const nonce = params.get("n") || "";
+  const key = `${command}:${nonce}`;
+  if (!command || key === game.lastUrlCommand) return;
+  game.lastUrlCommand = key;
+  if (command.toLowerCase().startsWith("tap") || command.toLowerCase().startsWith("jump")) {
+    game.debugCommand = `url:${key}`;
+    touchStart({ type: "url", cancelable: false });
+    touchEnd({ type: "url", cancelable: false });
+  }
+}
+
 function runInitialHashCommand() {
   game.lastHashCommand = "";
   pollHashBridge();
+  game.lastUrlCommand = "";
+  pollUrlCommandBridge();
 }
 
 function blockBrowserGesture(event) {
@@ -812,6 +829,7 @@ function loop(now = performance.now()) {
   last = now;
   pollAppInventorBridge();
   pollHashBridge();
+  pollUrlCommandBridge();
   update(dt);
   draw();
   requestAnimationFrame(loop);
