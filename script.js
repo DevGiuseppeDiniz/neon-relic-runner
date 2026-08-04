@@ -48,6 +48,7 @@ const game = {
   stars: [],
   lastPressAt: 0,
   lastReleaseAt: 0,
+  lastBridgeCommand: "",
 };
 
 function resize() {
@@ -139,6 +140,29 @@ function touchEnd(event) {
   game.lastReleaseAt = now;
   game.jumpHeld = false;
   game.holdTime = 0;
+}
+
+function handleBridgeCommand(rawCommand) {
+  if (!rawCommand || rawCommand === game.lastBridgeCommand) return;
+  game.lastBridgeCommand = rawCommand;
+  const command = String(rawCommand).split(":")[0].toLowerCase().trim();
+  if (command === "down" || command === "tap" || command === "jump" || command === "start") {
+    touchStart({ type: "appinventor", cancelable: false });
+  }
+  if (command === "up" || command === "release") {
+    touchEnd({ type: "appinventor", cancelable: false });
+  }
+}
+
+function pollAppInventorBridge() {
+  try {
+    const bridge = window.AppInventor;
+    if (bridge?.getWebViewString) {
+      handleBridgeCommand(bridge.getWebViewString());
+    }
+  } catch {
+    // Some browsers expose no App Inventor bridge outside the APK.
+  }
 }
 
 function blockBrowserGesture(event) {
@@ -748,6 +772,7 @@ let last = performance.now();
 function loop(now = performance.now()) {
   const dt = Math.min(0.033, (now - last) / 1000);
   last = now;
+  pollAppInventorBridge();
   update(dt);
   draw();
   requestAnimationFrame(loop);
@@ -767,6 +792,7 @@ function bindTouchControls(target) {
 
 window.neonDashPress = touchStart;
 window.neonDashRelease = touchEnd;
+window.neonDashCommand = handleBridgeCommand;
 window.addEventListener("resize", resize);
 bindTouchControls(canvas);
 bindTouchControls(ui.touchCatcher);
