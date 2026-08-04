@@ -13,6 +13,8 @@ const ui = {
   debugBridge: document.getElementById("debugBridge"),
   debugCommand: document.getElementById("debugCommand"),
   debugInput: document.getElementById("debugInput"),
+  debugScript: document.getElementById("debugScript"),
+  debugTick: document.getElementById("debugTick"),
 };
 
 const game = {
@@ -59,6 +61,7 @@ const game = {
   debugInput: "nenhum",
   debugBridge: "aguardando",
   debugCommand: "nenhum",
+  tick: 0,
 };
 
 function resize() {
@@ -811,11 +814,14 @@ function updateHud() {
   ui.score.textContent = Math.floor(game.score);
   ui.best.textContent = game.best;
   ui.coins.textContent = game.coins;
+  game.tick += 1;
   if (game.debug) {
     ui.debugPanel.classList.add("visible");
+    ui.debugScript.textContent = `script: externo OK inline ${window.__neonInlineLoaded ? "OK" : "NAO"}`;
     ui.debugBridge.textContent = `bridge: ${game.debugBridge}`;
     ui.debugCommand.textContent = `command: ${game.debugCommand}`;
     ui.debugInput.textContent = `input: ${game.debugInput}`;
+    ui.debugTick.textContent = `tick: ${game.tick}`;
   }
 }
 
@@ -832,7 +838,6 @@ function loop(now = performance.now()) {
   pollUrlCommandBridge();
   update(dt);
   draw();
-  requestAnimationFrame(loop);
 }
 
 function bindTouchControls(target) {
@@ -866,3 +871,4 @@ resize();
 startGame();
 runInitialHashCommand();
 loop();
+setInterval(() => loop(performance.now()), 1000 / 60);

@@ -104,7 +104,7 @@ body {
   left: max(10px, env(safe-area-inset-left));
   right: max(10px, env(safe-area-inset-right));
   bottom: max(58px, env(safe-area-inset-bottom));
-  display: none;
+  display: grid;
   gap: 4px;
   padding: 8px 10px;
   border: 1px solid rgba(248, 215, 72, 0.35);
