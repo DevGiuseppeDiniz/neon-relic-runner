@@ -53,6 +53,7 @@ const game = {
   lastPressAt: 0,
   lastReleaseAt: 0,
   lastBridgeCommand: "",
+  lastHashCommand: "",
   debug: true,
   debugInput: "nenhum",
   debugBridge: "aguardando",
@@ -177,6 +178,17 @@ function pollAppInventorBridge() {
   } catch {
     game.debugBridge = "erro ao ler AppInventor";
     // Some browsers expose no App Inventor bridge outside the APK.
+  }
+}
+
+function pollHashBridge() {
+  const hash = window.location.hash.replace(/^#/, "");
+  if (!hash || hash === game.lastHashCommand) return;
+  game.lastHashCommand = hash;
+  if (hash.toLowerCase().startsWith("tap") || hash.toLowerCase().startsWith("jump")) {
+    game.debugCommand = `hash:${hash}`;
+    touchStart({ type: "hash", cancelable: false });
+    touchEnd({ type: "hash", cancelable: false });
   }
 }
 
@@ -794,6 +806,7 @@ function loop(now = performance.now()) {
   const dt = Math.min(0.033, (now - last) / 1000);
   last = now;
   pollAppInventorBridge();
+  pollHashBridge();
   update(dt);
   draw();
   requestAnimationFrame(loop);
