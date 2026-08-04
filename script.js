@@ -863,5 +863,6 @@ window.addEventListener("keydown", (event) => {
 
 ui.best.textContent = game.best;
 resize();
+startGame();
 runInitialHashCommand();
 loop();
