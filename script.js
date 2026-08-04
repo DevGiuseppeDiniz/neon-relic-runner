@@ -9,6 +9,10 @@ const ui = {
   message: document.getElementById("messageText"),
   hint: document.getElementById("tapHint"),
   touchCatcher: document.getElementById("touchCatcher"),
+  debugPanel: document.getElementById("debugPanel"),
+  debugBridge: document.getElementById("debugBridge"),
+  debugCommand: document.getElementById("debugCommand"),
+  debugInput: document.getElementById("debugInput"),
 };
 
 const game = {
@@ -49,6 +53,10 @@ const game = {
   lastPressAt: 0,
   lastReleaseAt: 0,
   lastBridgeCommand: "",
+  debug: new URLSearchParams(window.location.search).has("debug"),
+  debugInput: "nenhum",
+  debugBridge: "aguardando",
+  debugCommand: "nenhum",
 };
 
 function resize() {
@@ -121,6 +129,7 @@ function endGame() {
 function touchStart(event) {
   blockBrowserGesture(event);
   const now = performance.now();
+  game.debugInput = `${event?.type || "unknown"} down ${Math.floor(now)}`;
   if (event?.type === "click" && now - game.lastPressAt < 520) return;
   if (now - game.lastPressAt < 55) return;
   game.lastPressAt = now;
@@ -136,6 +145,7 @@ function touchStart(event) {
 function touchEnd(event) {
   blockBrowserGesture(event);
   const now = performance.now();
+  game.debugInput = `${event?.type || "unknown"} up ${Math.floor(now)}`;
   if (now - game.lastReleaseAt < 45) return;
   game.lastReleaseAt = now;
   game.jumpHeld = false;
@@ -145,6 +155,7 @@ function touchEnd(event) {
 function handleBridgeCommand(rawCommand) {
   if (!rawCommand || rawCommand === game.lastBridgeCommand) return;
   game.lastBridgeCommand = rawCommand;
+  game.debugCommand = String(rawCommand);
   const command = String(rawCommand).split(":")[0].toLowerCase().trim();
   if (command === "down" || command === "tap" || command === "jump" || command === "start") {
     touchStart({ type: "appinventor", cancelable: false });
@@ -156,11 +167,15 @@ function handleBridgeCommand(rawCommand) {
 
 function pollAppInventorBridge() {
   try {
-    const bridge = window.AppInventor;
+    const bridge = window.AppInventor || globalThis.AppInventor;
     if (bridge?.getWebViewString) {
+      game.debugBridge = "AppInventor.getWebViewString OK";
       handleBridgeCommand(bridge.getWebViewString());
+      return;
     }
+    game.debugBridge = bridge ? "AppInventor sem getWebViewString" : "AppInventor ausente";
   } catch {
+    game.debugBridge = "erro ao ler AppInventor";
     // Some browsers expose no App Inventor bridge outside the APK.
   }
 }
@@ -762,6 +777,12 @@ function updateHud() {
   ui.score.textContent = Math.floor(game.score);
   ui.best.textContent = game.best;
   ui.coins.textContent = game.coins;
+  if (game.debug) {
+    ui.debugPanel.classList.add("visible");
+    ui.debugBridge.textContent = `bridge: ${game.debugBridge}`;
+    ui.debugCommand.textContent = `command: ${game.debugCommand}`;
+    ui.debugInput.textContent = `input: ${game.debugInput}`;
+  }
 }
 
 function clamp(value, min, max) {

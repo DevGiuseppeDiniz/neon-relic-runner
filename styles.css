@@ -98,6 +98,33 @@ body {
   text-shadow: 0 0 18px rgba(89, 226, 255, 0.42);
 }
 
+.debug-panel {
+  position: absolute;
+  z-index: 10;
+  left: max(10px, env(safe-area-inset-left));
+  right: max(10px, env(safe-area-inset-right));
+  bottom: max(58px, env(safe-area-inset-bottom));
+  display: none;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid rgba(248, 215, 72, 0.35);
+  border-radius: 8px;
+  background: rgba(5, 12, 22, 0.82);
+  color: #f3fbff;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+}
+
+.debug-panel.visible {
+  display: grid;
+}
+
+.debug-panel strong {
+  color: #f8d748;
+}
+
 .message-panel {
   position: absolute;
   z-index: 8;
