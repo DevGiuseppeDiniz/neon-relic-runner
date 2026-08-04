@@ -192,6 +192,11 @@ function pollHashBridge() {
   }
 }
 
+function runInitialHashCommand() {
+  game.lastHashCommand = "";
+  pollHashBridge();
+}
+
 function blockBrowserGesture(event) {
   if (event?.cancelable) event.preventDefault();
 }
@@ -840,4 +845,5 @@ window.addEventListener("keydown", (event) => {
 
 ui.best.textContent = game.best;
 resize();
+runInitialHashCommand();
 loop();
