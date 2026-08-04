@@ -60,10 +60,10 @@ body {
   touch-action: manipulation;
 }
 
-.hud {
+.hud,
+.status-row {
   position: absolute;
   z-index: 8;
-  top: max(12px, env(safe-area-inset-top));
   left: max(10px, env(safe-area-inset-left));
   right: max(10px, env(safe-area-inset-right));
   display: grid;
@@ -72,7 +72,16 @@ body {
   pointer-events: none;
 }
 
-.hud > div {
+.hud {
+  top: max(12px, env(safe-area-inset-top));
+}
+
+.status-row {
+  top: calc(max(12px, env(safe-area-inset-top)) + 64px);
+}
+
+.hud > div,
+.status-row > div {
   min-height: 54px;
   padding: 8px 10px;
   border: 1px solid rgba(146, 221, 255, 0.25);
@@ -90,12 +99,46 @@ body {
   text-transform: uppercase;
 }
 
-.hud strong {
+.hud strong,
+.status-row strong {
   display: block;
   margin-top: 3px;
   font-size: clamp(1.22rem, 5vw, 2rem);
   line-height: 1;
   text-shadow: 0 0 18px rgba(89, 226, 255, 0.42);
+}
+
+.status-row > div {
+  min-height: 42px;
+}
+
+.status-row strong {
+  overflow: hidden;
+  font-size: clamp(0.82rem, 3vw, 1rem);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress-track {
+  position: absolute;
+  z-index: 8;
+  top: calc(max(12px, env(safe-area-inset-top)) + 115px);
+  left: max(10px, env(safe-area-inset-left));
+  right: max(10px, env(safe-area-inset-right));
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.13);
+  pointer-events: none;
+}
+
+.progress-track i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #68e4ff, #f8d748, #ff4d7d);
+  box-shadow: 0 0 18px rgba(104, 228, 255, 0.5);
 }
 
 .message-panel {
@@ -172,9 +215,22 @@ h1 {
     gap: 6px;
   }
 
-  .hud > div {
+  .status-row {
+    gap: 6px;
+  }
+
+  .hud > div,
+  .status-row > div {
     min-height: 48px;
     padding: 7px 8px;
+  }
+
+  .status-row {
+    top: calc(max(12px, env(safe-area-inset-top)) + 58px);
+  }
+
+  .progress-track {
+    top: calc(max(12px, env(safe-area-inset-top)) + 106px);
   }
 
   .message-panel {
